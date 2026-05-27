@@ -16,7 +16,9 @@ def create_app(config=Config):
     Migrate(app, db)
     CORS(app, origins=app.config["ALLOWED_ORIGINS"])
 
-    PrometheusMetrics(app)
+    if not app.config.get("TESTING"):
+        from prometheus_flask_exporter import PrometheusMetrics
+        PrometheusMetrics(app)
 
     from .routes.transactions import bp as transactions_bp
     from .routes.analytics import bp as analytics_bp
