@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY: rapiddeploy.azurecr.io
-  IMAGE_NAME: rapiddeploy/payday-api
+  IMAGE_NAME: rapiddeploy/payday-backend
   PYTHON_VERSION: '3.13'
   WORKING_DIR: src/backend
 
