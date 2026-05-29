@@ -1,0 +1,110 @@
+name: Payday CI Frontend Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/frontend/**'
+      - '.github/workflows/frontend_pipeline_ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/frontend/**'
+
+env:
+  REGISTRY: rapiddeploy.azurecr.io
+  IMAGE_NAME: rapiddeploy/payday-app
+
+jobs:
+  # 🔒 SECURITY, QUALITY GATES & BUILD
+  test-and-scan-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # For CodeQL/SARIF
+      packages: write        # Required to push to GHCR
+      id-token: write        # Required for Cosign keyless signing
+    outputs:
+      image_name_lower: ${{ steps.downcase.outputs.lowercase }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Solves scope issue: Convert to lowercase and store as an output AND env
+      - name: Downcase regional variables for Docker
+        id: downcase
+        run: |
+          LOWEST=${IMAGE_NAME,,}
+          echo "lowercase=${LOWEST}" >> $GITHUB_OUTPUT
+          echo "IMAGE_NAME_LOWER=${LOWEST}" >> $GITHUB_ENV
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+
+      - name: Setup Node.js (example app)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install dependencies & run tests
+        working-directory: src/frontend
+        run: |
+          npm ci
+          npm run test
+          npm run lint
+
+      - name: Run SAST (CodeQL)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      - uses: github/codeql-action/analyze@v3
+
+      - name: Build Docker image (multi-stage)
+        working-directory: src/frontend
+        run: |
+          docker build \
+            --build-arg NODE_ENV=production \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest \
+            -f Dockerfile.prod .
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1' # Fail pipeline on critical/high CVEs
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      # Log in and push here because the built image lives on THIS runner VM
+      - name: Log in to Azure via OIDC
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Push image to registry
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
+
+      - name: Sign image with Cosign (keyless)
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3
+      - name: Sign Docker Image
+        if: github.event_name != 'pull_request'
+        run: |
+          cosign sign --yes \
+            -a "github_actor=${{ github.actor }}" \
+            -a "run_id=${{ github.run_id }}" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
