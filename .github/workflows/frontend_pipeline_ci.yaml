@@ -26,7 +26,7 @@ jobs:
       id-token: write        # Required for Cosign keyless signing
     outputs:
       image_name_lower: ${{ steps.downcase.outputs.lowercase }}
-    steps:
+      steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
