@@ -1,11 +1,11 @@
-name: Payday CI/CD Backend Pipeline
+name: CloudOpsHub CI/CD Backend Pipeline
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'src/backend/**'
-      - '.github/workflows/backend_pipeline_ci.yml'
+      - '.github/workflows/backend_pipeline_ci.yaml'
   pull_request:
     branches: [ main ]
     paths:
@@ -25,9 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write       # REQUIRED: To push to GHCR
+      packages: write        # REQUIRED: To push to GHCR
       security-events: write # For CodeQL/SARIF
-      id-token: write       # REQUIRED: For Cosign keyless signing
+      id-token: write        # REQUIRED: For OIDC login & Cosign keyless signing
 
     services:
       postgres:
@@ -48,11 +48,11 @@ jobs:
       run:
         working-directory: ${{ env.WORKING_DIR }}
 
-      steps:
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Downcase regional variables for Docker
+      - name: Downcase image name for Docker
         run: |
           echo "IMAGE_NAME_LOWER=${IMAGE_NAME,,}" >> $GITHUB_ENV
         env:
@@ -97,11 +97,14 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Azure via OIDC
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name rapiddeploy
 
       - name: Extract Metadata for Docker
         id: meta
@@ -118,7 +121,7 @@ jobs:
         with:
           context: ${{ env.WORKING_DIR }}
           file: ${{ env.WORKING_DIR }}/Dockerfile.prod
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
@@ -142,10 +145,12 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
-      - name: Sign image with Cosign (keyless)
+      - name: Install Cosign
+        if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3
 
       - name: Sign the published Docker image
+        if: github.event_name != 'pull_request'
         run: |
           cosign sign --yes \
             -a "github_actor=${{ github.actor }}" \
