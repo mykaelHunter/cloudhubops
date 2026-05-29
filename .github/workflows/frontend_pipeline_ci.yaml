@@ -19,6 +19,7 @@ jobs:
   # 🔒 SECURITY, QUALITY GATES & BUILD
   test-and-scan-build:
     runs-on: ubuntu-latest
+    environment: dev
     permissions:
       contents: read
       security-events: write # For CodeQL/SARIF
@@ -75,7 +76,7 @@ jobs:
             --build-arg NODE_ENV=production \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }} \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest \
-            -f Dockerfile.prod .
+            -f Dockerfile.dev .
 
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@master
