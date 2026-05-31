@@ -17,6 +17,8 @@ spec:
         app: payday-frontend
         environment: staging
     spec:
+      imagePullSecrets:
+        - name: acr-secret
       containers:
         - name: payday-frontend
           image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:latest

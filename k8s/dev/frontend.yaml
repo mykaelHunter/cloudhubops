@@ -17,9 +17,11 @@ spec:
         app: payday-frontend
         environment: dev
     spec:
+      imagePullSecrets:
+        - name: acr-secret
       containers:
         - name: payday-frontend
-          image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:latest
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:dev
           ports:
             - containerPort: 80
           resources:

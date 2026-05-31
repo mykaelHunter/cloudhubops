@@ -73,9 +73,9 @@ jobs:
         working-directory: src/frontend
         run: |
           docker build \
-            --build-arg NODE_ENV=production \
+            --build-arg NODE_ENV=dev \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }} \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:dev \
             -f Dockerfile.dev .
 
       - name: Scan image with Trivy
@@ -109,7 +109,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:dev
 
       - name: Install Cosign
         if: github.event_name != 'pull_request'
