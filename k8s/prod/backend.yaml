@@ -27,25 +27,27 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: payday-api
+  name: payday-backend
   namespace: prod
   labels:
-    app: payday-api
+    app: payday-backend
     environment: prod
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: payday-api
+      app: payday-backend
   template:
     metadata:
       labels:
-        app: payday-api
+        app: payday-backend
         environment: prod
     spec:
+      imagePullSecrets:
+        - name: acr-secret
       containers:
-        - name: payday-api
-          image: rapiddeploy.azurecr.io/rapiddeploy/payday-api:latest
+        - name: payday-backend
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-backend:latest
           ports:
             - containerPort: 5000
           envFrom:
@@ -85,11 +87,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: payday-api
+  name: payday-backend
   namespace: prod
 spec:
   selector:
-    app: payday-api
+    app: payday-backend
   ports:
     - port: 5000
       targetPort: 5000
@@ -97,10 +99,10 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: payday-api-pdb
+  name: payday-backend-pdb
   namespace: prod
 spec:
   minAvailable: 2
   selector:
     matchLabels:
-      app: payday-api
+      app: payday-backend

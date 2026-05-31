@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: payday-frontend
-          image: rapiddeploy.azurecr.io/rapiddeploy/payday-app:latest
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:latest
           ports:
             - containerPort: 80
           resources:

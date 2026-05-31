@@ -28,25 +28,27 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: payday-api
+  name: payday-backend
   namespace: dev
   labels:
-    app: payday-api
+    app: payday-backend
     environment: dev
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: payday-api
+      app: payday-backend
   template:
     metadata:
       labels:
-        app: payday-api
+        app: payday-backend
         environment: dev
     spec:
+      imagePullSecrets:
+        - name: acr-secret
       containers:
-        - name: payday-api
-          image: rapiddeploy.azurecr.io/rapiddeploy/payday-api:latest
+        - name: payday-backend
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-backend:latest
           ports:
             - containerPort: 5000
           envFrom:
@@ -86,11 +88,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: payday-api
+  name: payday-backend
   namespace: dev
 spec:
   selector:
-    app: payday-api
+    app: payday-backend
   ports:
     - port: 5000
       targetPort: 5000
