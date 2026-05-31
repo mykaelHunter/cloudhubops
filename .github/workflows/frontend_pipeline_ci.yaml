@@ -19,21 +19,21 @@ jobs:
   # 🔒 SECURITY, QUALITY GATES & BUILD
   test-and-scan-build:
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ github.ref == 'refs/heads/develop' && 'dev' || 'staging' }}
     permissions:
       contents: read
       security-events: write # For CodeQL/SARIF
-      packages: write        # Required to push to GHCR
+      packages: write        # Required to push to ACR
       id-token: write        # Required for OIDC login & Cosign keyless signing
 
     outputs:
       image_name_lower: ${{ steps.downcase.outputs.lowercase }}
+      image_tag: ${{ steps.tag.outputs.ENV_TAG }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Solves scope issue: Convert to lowercase and store as an output AND env
       - name: Downcase image name for Docker
         id: downcase
         run: |
@@ -42,6 +42,20 @@ jobs:
           echo "IMAGE_NAME_LOWER=${LOWEST}" >> $GITHUB_ENV
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
+
+      # Determine image tag and Dockerfile based on branch
+      - name: Set environment tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "ENV_TAG=dev" >> $GITHUB_OUTPUT
+            echo "ENV_TAG=dev" >> $GITHUB_ENV
+            echo "DOCKERFILE=Dockerfile.dev" >> $GITHUB_ENV
+          else
+            echo "ENV_TAG=staging" >> $GITHUB_OUTPUT
+            echo "ENV_TAG=staging" >> $GITHUB_ENV
+            echo "DOCKERFILE=Dockerfile.prod" >> $GITHUB_ENV
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -73,10 +87,10 @@ jobs:
         working-directory: src/frontend
         run: |
           docker build \
-            --build-arg NODE_ENV=dev \
+            --build-arg NODE_ENV=${{ env.ENV_TAG }} \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }} \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:dev \
-            -f Dockerfile.dev .
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.ENV_TAG }} \
+            -f ${{ env.DOCKERFILE }} .
 
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@master
@@ -85,7 +99,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1' # Fail pipeline on critical/high CVEs
+          exit-code: '1'
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -109,7 +123,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:dev
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.ENV_TAG }}
 
       - name: Install Cosign
         if: github.event_name != 'pull_request'

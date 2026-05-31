@@ -1,4 +1,4 @@
-name: CloudOpsHub CI/CD Backend Pipeline
+name: CloudOpsHub CI Backend Pipeline
 
 on:
   push:
@@ -23,10 +23,10 @@ jobs:
   # ==========================================
   test-and-scan:
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ github.ref == 'refs/heads/develop' && 'dev' || 'staging' }}
     permissions:
       contents: read
-      packages: write        # REQUIRED: To push to GHCR
+      packages: write        # REQUIRED: To push to ACR
       security-events: write # For CodeQL/SARIF
       id-token: write        # REQUIRED: For OIDC login & Cosign keyless signing
 
@@ -49,15 +49,36 @@ jobs:
       run:
         working-directory: ${{ env.WORKING_DIR }}
 
+    outputs:
+      image_tag: ${{ steps.tag.outputs.ENV_TAG }}
+      image_name_lower: ${{ steps.downcase.outputs.lowercase }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Downcase image name for Docker
+        id: downcase
         run: |
-          echo "IMAGE_NAME_LOWER=${IMAGE_NAME,,}" >> $GITHUB_ENV
+          LOWEST=${IMAGE_NAME,,}
+          echo "lowercase=${LOWEST}" >> $GITHUB_OUTPUT
+          echo "IMAGE_NAME_LOWER=${LOWEST}" >> $GITHUB_ENV
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
+
+      # Determine image tag and Dockerfile based on branch
+      - name: Set environment tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "ENV_TAG=dev" >> $GITHUB_OUTPUT
+            echo "ENV_TAG=dev" >> $GITHUB_ENV
+            echo "DOCKERFILE=Dockerfile.dev" >> $GITHUB_ENV
+          else
+            echo "ENV_TAG=staging" >> $GITHUB_OUTPUT
+            echo "ENV_TAG=staging" >> $GITHUB_ENV
+            echo "DOCKERFILE=Dockerfile.prod" >> $GITHUB_ENV
+          fi
 
       - name: Setup Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -107,26 +128,16 @@ jobs:
       - name: Log in to Azure Container Registry
         run: az acr login --name rapiddeploy
 
-      - name: Extract Metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
-          tags: |
-            type=raw,value=latest
-            type=sha,format=short
-
       - name: Build and Push Docker Image
         id: build-image
         uses: docker/build-push-action@v6
         with:
           context: ${{ env.WORKING_DIR }}
-          file: ${{ env.WORKING_DIR }}/Dockerfile.dev
+          file: ${{ env.WORKING_DIR }}/${{ env.DOCKERFILE }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.ENV_TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

@@ -1,0 +1,196 @@
+name: CloudOpsHub CD Backend Pipeline
+
+on:
+  # Triggered after CI pipeline completes successfully
+  workflow_run:
+    workflows: ["CloudOpsHub CI Backend Pipeline"]
+    types: [completed]
+    branches: [ main, develop ]
+
+  # Allow manual trigger for hotfixes or redeployments
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+
+env:
+  REGISTRY: rapiddeploy.azurecr.io
+  IMAGE_NAME: rapiddeploy/payday-backend
+  ARGOCD_SERVER: localhost:8085
+
+jobs:
+  # ==========================================
+  # DEPLOY TO DEV — auto on develop branch
+  # ==========================================
+  deploy-dev:
+    runs-on: ubuntu-latest
+    environment: dev
+    if: |
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'develop') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Update the image tag in the k8s manifest to the new SHA
+      # ArgoCD watches this file and auto-syncs when it changes
+      - name: Update dev image tag in manifests
+        run: |
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
+          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}|g" \
+            k8s/dev/backend.yaml
+          echo "Updated backend dev image to SHA: ${SHORT_SHA}"
+
+      - name: Commit and push updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/dev/backend.yaml
+          git diff --staged --quiet || git commit -m "chore(cd): update backend dev image to ${{ github.event.workflow_run.head_sha || github.sha }}"
+          git push origin develop
+
+      - name: Wait for ArgoCD to sync dev
+        run: |
+          echo "ArgoCD will auto-sync cloudopshub-dev within 3 minutes"
+          echo "Monitor at: https://localhost:9090/applications/cloudopshub-dev"
+
+      - name: Notify dev deployment
+        run: |
+          echo "✅ Backend deployed to DEV"
+          echo "Branch: develop"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev"
+          echo "SHA: ${{ github.event.workflow_run.head_sha || github.sha }}"
+
+  # ==========================================
+  # DEPLOY TO STAGING — auto on main branch
+  # ==========================================
+  deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    if: |
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update staging image tag in manifests
+        run: |
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
+          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}|g" \
+            k8s/staging/backend.yaml
+          echo "Updated backend staging image to SHA: ${SHORT_SHA}"
+
+      - name: Commit and push updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/staging/backend.yaml
+          git diff --staged --quiet || git commit -m "chore(cd): update backend staging image to ${{ github.event.workflow_run.head_sha || github.sha }}"
+          git push origin main
+
+      - name: Wait for ArgoCD to sync staging
+        run: |
+          echo "ArgoCD will auto-sync cloudopshub-staging within 3 minutes"
+          echo "Monitor at: https://localhost:9090/applications/cloudopshub-staging"
+
+      - name: Notify staging deployment
+        run: |
+          echo "✅ Backend deployed to STAGING"
+          echo "Branch: main"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
+          echo "SHA: ${{ github.event.workflow_run.head_sha || github.sha }}"
+
+  # ==========================================
+  # DEPLOY TO PROD — manual approval required
+  # ==========================================
+  deploy-prod:
+    runs-on: ubuntu-latest
+    environment: prod        # ← triggers GitHub approval gate
+    needs: deploy-staging
+    if: |
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name rapiddeploy
+
+      # Retag the staging image as prod — no rebuild
+      - name: Promote staging image to prod
+        run: |
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}
+          docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA} \
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
+          echo "PROMOTED_SHA=${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Update prod image tag in manifests
+        run: |
+          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.PROMOTED_SHA }}|g" \
+            k8s/prod/backend.yaml
+
+      - name: Commit and push updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/prod/backend.yaml
+          git diff --staged --quiet || git commit -m "chore(cd): promote backend to prod — ${{ env.PROMOTED_SHA }}"
+          git push origin main
+
+      - name: Notify prod deployment
+        run: |
+          echo "🚀 Backend promoted to PROD"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod"
+          echo "SHA: ${{ env.PROMOTED_SHA }}"
