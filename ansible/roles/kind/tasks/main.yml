@@ -1,0 +1,59 @@
+---
+# ============================================================
+# Role: kind — Install kind and create local cluster
+# ============================================================
+
+- name: Download kind binary
+  get_url:
+    url: "https://kind.sigs.k8s.io/dl/{{ kind_version }}/kind-linux-amd64"
+    dest: /tmp/kind
+    mode: '0755'
+
+- name: Install kind binary
+  copy:
+    src: /tmp/kind
+    dest: /usr/local/bin/kind
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Verify kind installation
+  command: kind version
+  register: kind_version_output
+  changed_when: false
+
+- name: Print kind version
+  debug:
+    msg: "{{ kind_version_output.stdout }}"
+
+- name: Create kind cluster config directory
+  file:
+    path: "{{ kind_config_path | dirname }}"
+    state: directory
+    mode: '0755'
+
+- name: Copy kind cluster config
+  template:
+    src: kind-cluster.yaml.j2
+    dest: "{{ kind_config_path }}"
+    mode: '0644'
+
+- name: Check if kind cluster already exists
+  command: kind get clusters
+  register: existing_clusters
+  changed_when: false
+
+- name: Create kind cluster
+  command: "kind create cluster --config {{ kind_config_path }}"
+  when: kind_cluster_name not in existing_clusters.stdout
+  register: kind_create_output
+
+- name: Print kind cluster creation output
+  debug:
+    msg: "{{ kind_create_output.stdout_lines }}"
+  when: kind_create_output.changed
+
+- name: Create required namespaces on kind cluster
+  command: "kubectl create namespace {{ item }} --dry-run=client -o yaml | kubectl apply -f -"
+  loop: "{{ kind_namespaces }}"
+  changed_when: false

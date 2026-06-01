@@ -1,0 +1,73 @@
+---
+# ============================================================
+# Role: docker — Install and configure Docker
+# ============================================================
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  become: yes
+
+- name: Install required system packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
+  become: yes
+
+- name: Install Docker
+  apt:
+    name: docker.io
+    state: present
+  become: yes
+
+- name: Enable and start Docker service
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  become: yes
+
+- name: Set Docker daemon config (resource limits)
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "default-ulimits": {
+          "nofile": {
+            "Name": "nofile",
+            "Hard": 64000,
+            "Soft": 64000
+          }
+        }
+      }
+    mode: '0644'
+  become: yes
+  notify: restart docker
+
+- name: Verify Docker is running
+  command: docker info
+  register: docker_info
+  changed_when: false
+
+- name: Print Docker version
+  debug:
+    msg: "Docker installed: {{ docker_info.stdout_lines[0] }}"

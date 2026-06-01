@@ -1,0 +1,124 @@
+---
+# ============================================================
+# Role: security — Harden the VM running the kind cluster
+# ============================================================
+
+- name: Update all packages
+  apt:
+    upgrade: dist
+    update_cache: yes
+  become: yes
+
+- name: Install security packages
+  apt:
+    name:
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+      - auditd
+    state: present
+  become: yes
+
+- name: Set kernel parameters for Kubernetes
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: yes
+    reload: yes
+  loop:
+    - { name: 'vm.max_map_count', value: '262144' }
+    - { name: 'fs.inotify.max_user_watches', value: '524288' }
+    - { name: 'fs.inotify.max_user_instances', value: '512' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+  become: yes
+
+- name: Configure UFW default policies
+  ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: 'incoming', policy: 'deny' }
+    - { direction: 'outgoing', policy: 'allow' }
+  become: yes
+
+- name: Allow SSH through UFW
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+  become: yes
+
+- name: Allow ArgoCD port through UFW
+  ufw:
+    rule: allow
+    port: '9090'
+    proto: tcp
+  become: yes
+
+- name: Allow kind cluster ports through UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - '8080'
+    - '8443'
+  become: yes
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+  become: yes
+
+- name: Configure fail2ban for SSH
+  copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      bantime = 3600
+      findtime = 600
+    mode: '0644'
+  become: yes
+  notify: restart fail2ban
+
+- name: Enable and start fail2ban
+  systemd:
+    name: fail2ban
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Configure unattended upgrades for security patches
+  copy:
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    content: |
+      Unattended-Upgrade::Allowed-Origins {
+        "${distro_id}:${distro_codename}-security";
+      };
+      Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+      Unattended-Upgrade::Automatic-Reboot "false";
+    mode: '0644'
+  become: yes
+
+- name: Enable auditd service
+  systemd:
+    name: auditd
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Set file permissions on sensitive files
+  file:
+    path: "{{ item }}"
+    mode: '0600'
+  loop:
+    - "/home/{{ ansible_user }}/.kube/config"
+  failed_when: false
