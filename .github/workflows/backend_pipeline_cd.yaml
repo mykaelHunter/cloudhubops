@@ -70,7 +70,7 @@ jobs:
       - name: Wait for ArgoCD to sync dev
         run: |
           echo "ArgoCD will auto-sync cloudopshub-dev within 3 minutes"
-          echo "Monitor at: https://localhost:9090/applications/cloudopshub-dev"
+          echo "Monitor at: https://localhost:8085/applications/cloudopshub-dev"
 
       - name: Notify dev deployment
         run: |
