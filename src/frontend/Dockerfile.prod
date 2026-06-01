@@ -26,7 +26,7 @@ RUN apk upgrade --no-cache libxml2
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Configure nginx
-COPY nginx.conf /etc/nginx/templates/default.conf.templates
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # Expose default env vars — overridden per environment
 ENV BACKEND_HOST=localhost
