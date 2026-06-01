@@ -98,6 +98,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Azure via OIDC
@@ -120,12 +121,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/staging/backend.yaml
           git diff --staged --quiet || git commit -m "Update backend staging image to ${{ github.event.workflow_run.head_sha || github.sha }}"
-          git push origin ${{ github.ref_name }}
+          git push origin main
 
       - name: Wait for ArgoCD to sync staging
         run: |
           echo "ArgoCD will auto-sync cloudopshub-staging within 3 minutes"
-          echo "Monitor at: https://localhost:9090/applications/cloudopshub-staging"
+          echo "Monitor at: https://localhost:8085/applications/cloudopshub-staging"
 
       - name: Notify staging deployment
         run: |
@@ -154,6 +155,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Azure via OIDC
@@ -187,7 +189,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/prod/backend.yaml
           git diff --staged --quiet || git commit -m "Promote backend to prod — ${{ env.PROMOTED_SHA }}"
-          git push origin ${{ github.ref_name }}
+          git push origin main
 
       - name: Notify prod deployment
         run: |
