@@ -1,0 +1,7 @@
+"UsageDate","ResourceGroupName","SubscriptionName","CostUSD","Cost","Currency"
+"2026-05-29","cloudopshub-rg","Azure subscription 1","0.015014825","0.015014825","USD"
+"2026-05-30","cloudopshub-rg","Azure subscription 1","0.1666013328","0.1666013328","USD"
+"2026-05-31","cloudopshub-rg","Azure subscription 1","0.238063882","0.238063882","USD"
+"2026-05-31","mc_cloudopshub-rg_cloudopshub-aks_eastus","Azure subscription 1","2.46894514121293","2.46894514121293","USD"
+"2026-06-01","cloudopshub-rg","Azure subscription 1","0.2221359104","0.2221359104","USD"
+"2026-06-01","mc_cloudopshub-rg_cloudopshub-aks_eastus","Azure subscription 1","4.1943048632332","4.1943048632332","USD"
