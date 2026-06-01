@@ -54,6 +54,6 @@
   when: kind_create_output.changed
 
 - name: Create required namespaces on kind cluster
-  command: "kubectl create namespace {{ item }} --dry-run=client -o yaml | kubectl apply -f -"
+  shell: "kubectl get namespace {{ item }} > /dev/null 2>&1 || kubectl create namespace {{ item }}"
   loop: "{{ kind_namespaces }}"
   changed_when: false
