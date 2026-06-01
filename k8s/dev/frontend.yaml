@@ -21,7 +21,7 @@ spec:
         - name: acr-secret
       containers:
         - name: payday-frontend
-          image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:77099bd
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:dev
           ports:
             - containerPort: 80
           resources:
