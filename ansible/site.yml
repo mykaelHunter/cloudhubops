@@ -1,0 +1,78 @@
+---
+# ============================================================
+# CloudOpsHub — Master Playbook
+# Run: ansible-playbook -i inventory.ini site.yml
+# ============================================================
+
+- name: CloudOpsHub — Full VM Setup & Kind Cluster Bootstrap
+  hosts: local_cluster
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Verify target is Ubuntu
+      assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+        fail_msg: "This playbook requires Ubuntu"
+
+    - name: Print system info
+      debug:
+        msg:
+          - "Host: {{ inventory_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "RAM: {{ ansible_memtotal_mb }}MB"
+          - "CPUs: {{ ansible_processor_vcpus }}"
+
+    - name: Check minimum RAM (6GB)
+      assert:
+        that:
+          - ansible_memtotal_mb >= 6000
+        fail_msg: "Minimum 6GB RAM required. Found: {{ ansible_memtotal_mb }}MB"
+
+  roles:
+    - role: security
+      tags: [security]
+
+    - role: docker
+      tags: [docker]
+
+    - role: kubectl
+      tags: [kubectl]
+
+    - role: kind
+      tags: [kind]
+
+    - role: helm
+      tags: [helm]
+
+    - role: argocd
+      tags: [argocd]
+
+  post_tasks:
+    - name: Verify all tools are installed
+      command: "{{ item }}"
+      loop:
+        - docker --version
+        - kubectl version --client
+        - kind version
+        - helm version
+        - argocd version --client
+      changed_when: false
+      register: tool_versions
+
+    - name: Print installed tool versions
+      debug:
+        msg: "{{ item.stdout }}"
+      loop: "{{ tool_versions.results }}"
+
+    - name: Print setup complete message
+      debug:
+        msg:
+          - "============================================"
+          - "CloudOpsHub VM Setup Complete!"
+          - "============================================"
+          - "Kind cluster: {{ kind_cluster_name }}"
+          - "ArgoCD UI: https://localhost:{{ argocd_port }}"
+          - "ArgoCD user: admin"
+          - "Next: Set up AKS with Terraform"
+          - "============================================"

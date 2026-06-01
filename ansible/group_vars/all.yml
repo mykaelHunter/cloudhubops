@@ -1,0 +1,51 @@
+# ============================================================
+# CloudOpsHub — Global Variables
+# ============================================================
+
+# Versions
+kind_version: "v0.23.0"
+kubectl_version: "stable"
+helm_version: "3"
+argocd_version: "latest"
+
+# Kind cluster
+kind_cluster_name: "cloudopshub-local"
+kind_config_path: "/home/{{ ansible_user }}/cloudopshub/kind-cluster.yaml"
+
+# ArgoCD
+argocd_namespace: "argocd"
+argocd_port: 9090
+
+# ACR
+acr_name: "rapiddeploy"
+acr_server: "rapiddeploy.azurecr.io"
+
+# Namespaces to create on kind cluster
+kind_namespaces:
+  - argocd
+  - prod
+  - monitoring
+
+# Namespaces to create on AKS
+aks_namespaces:
+  - dev
+  - staging
+  - monitoring
+
+# ArgoCD applications
+argocd_apps:
+  - name: cloudopshub-dev
+    path: k8s/dev
+    dest_server: "https://cloudopshub-ki26rmen.hcp.eastus.azmk8s.io:443"
+    dest_namespace: dev
+    sync_policy: automated
+  - name: cloudopshub-staging
+    path: k8s/staging
+    dest_server: "https://cloudopshub-ki26rmen.hcp.eastus.azmk8s.io:443"
+    dest_namespace: staging
+    sync_policy: automated
+  - name: cloudopshub-prod
+    path: k8s/prod
+    dest_server: "https://kubernetes.default.svc"
+    dest_namespace: prod
+    sync_policy: none

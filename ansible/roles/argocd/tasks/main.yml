@@ -1,0 +1,94 @@
+---
+# ============================================================
+# Role: argocd — Install ArgoCD CLI and deploy to kind cluster
+# ============================================================
+
+- name: Download ArgoCD CLI
+  get_url:
+    url: "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64"
+    dest: /tmp/argocd
+    mode: '0755'
+
+- name: Install ArgoCD CLI
+  copy:
+    src: /tmp/argocd
+    dest: /usr/local/bin/argocd
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Verify ArgoCD CLI installation
+  command: argocd version --client
+  register: argocd_cli_version
+  changed_when: false
+
+- name: Apply ArgoCD manifests to kind cluster
+  command: kubectl apply -n {{ argocd_namespace }} -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  register: argocd_install
+  changed_when: "'configured' in argocd_install.stdout or 'created' in argocd_install.stdout"
+
+- name: Wait for ArgoCD pods to be ready
+  command: kubectl wait --for=condition=Ready pods --all -n {{ argocd_namespace }} --timeout=300s
+  register: argocd_ready
+  changed_when: false
+
+- name: Print ArgoCD pod status
+  debug:
+    msg: "{{ argocd_ready.stdout }}"
+
+- name: Get ArgoCD initial admin password
+  command: >
+    kubectl get secret argocd-initial-admin-secret
+    -n {{ argocd_namespace }}
+    -o jsonpath="{.data.password}"
+  register: argocd_password_b64
+  changed_when: false
+
+- name: Decode ArgoCD admin password
+  set_fact:
+    argocd_admin_password: "{{ argocd_password_b64.stdout | b64decode }}"
+
+- name: Print ArgoCD admin password
+  debug:
+    msg: "ArgoCD admin password: {{ argocd_admin_password }} — CHANGE THIS IMMEDIATELY"
+
+- name: Start ArgoCD port-forward in background
+  shell: "nohup kubectl port-forward svc/argocd-server -n {{ argocd_namespace }} {{ argocd_port }}:443 &>/tmp/argocd-portforward.log &"
+  changed_when: false
+
+- name: Wait for ArgoCD port-forward to be ready
+  wait_for:
+    port: "{{ argocd_port }}"
+    host: localhost
+    timeout: 30
+
+- name: Login to ArgoCD CLI
+  command: "argocd login localhost:{{ argocd_port }} --insecure --username admin --password {{ argocd_admin_password }}"
+  changed_when: false
+
+- name: Add AKS cluster to ArgoCD
+  command: "argocd cluster add cloudopshub-aks --name cloudopshub-aks --yes"
+  register: aks_cluster_add
+  changed_when: true
+  failed_when:
+    - aks_cluster_add.rc != 0
+    - "'already exists' not in aks_cluster_add.stderr"
+
+- name: Create ArgoCD applications
+  command: >
+    argocd app create {{ item.name }}
+    --repo https://github.com/mykaelHunter/cloudopshub.git
+    --path {{ item.path }}
+    --dest-server {{ item.dest_server }}
+    --dest-namespace {{ item.dest_namespace }}
+    {% if item.sync_policy == 'automated' %}
+    --sync-policy automated --auto-prune --self-heal
+    {% else %}
+    --sync-policy none
+    {% endif %}
+  loop: "{{ argocd_apps }}"
+  register: app_create
+  changed_when: true
+  failed_when:
+    - app_create.rc != 0
+    - "'already exists' not in app_create.stderr"
