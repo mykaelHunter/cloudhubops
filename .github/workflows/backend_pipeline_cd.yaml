@@ -54,10 +54,9 @@ jobs:
       # ArgoCD watches this file and auto-syncs when it changes
       - name: Update dev image tag in manifests
         run: |
-          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
-          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}|g" \
+          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev|g" \
             k8s/dev/backend.yaml
-          echo "Updated backend dev image to SHA: ${SHORT_SHA}"
+          echo "Updated backend dev image to dev"
 
       - name: Commit and push updated manifest
         run: |
@@ -110,10 +109,9 @@ jobs:
 
       - name: Update staging image tag in manifests
         run: |
-          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
-          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}|g" \
+          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging|g" \
             k8s/staging/backend.yaml
-          echo "Updated backend staging image to SHA: ${SHORT_SHA}"
+          echo "Updated backend staging image to staging"
 
       - name: Commit and push updated manifest
         run: |
@@ -170,9 +168,8 @@ jobs:
       # Retag the staging image as prod — no rebuild
       - name: Promote staging image to prod
         run: |
-          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}
-          docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA} \
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+          docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging \
                       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
           echo "PROMOTED_SHA=${SHORT_SHA}" >> $GITHUB_ENV
