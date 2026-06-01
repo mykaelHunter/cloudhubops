@@ -172,7 +172,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull
+          git pull origin main --rebase
           git add k8s/prod/frontend.yaml
           git diff --staged --quiet || git commit -m "Promote frontend to prod"
           git push origin HEAD:main

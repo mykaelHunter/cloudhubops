@@ -24,6 +24,11 @@ spec:
           image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:prod
           ports:
             - containerPort: 80
+          env:
+            - name: BACKEND_HOST
+              value: "payday-backend.prod.svc.cluster.local"
+            - name: BACKEND_PORT
+              value: "5000"
           resources:
             requests:
               memory: "64Mi"
