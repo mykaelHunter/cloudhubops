@@ -22,6 +22,7 @@ spec:
       containers:
         - name: payday-frontend
           image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:prod
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           env:

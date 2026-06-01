@@ -49,6 +49,7 @@ spec:
       containers:
         - name: payday-backend
           image: rapiddeploy.azurecr.io/rapiddeploy/payday-backend:staging
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           envFrom:
