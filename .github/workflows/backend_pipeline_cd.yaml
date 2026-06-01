@@ -138,13 +138,13 @@ jobs:
   # ==========================================
   deploy-prod:
     runs-on: ubuntu-latest
-    environment: prod        # ← triggers GitHub approval gate
+    environment: production        # ← triggers GitHub approval gate
     needs: deploy-staging
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
     permissions:
       contents: write
       id-token: write
@@ -153,6 +153,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Azure via OIDC
@@ -172,11 +173,10 @@ jobs:
           docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging \
                       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
-          echo "PROMOTED_SHA=${SHORT_SHA}" >> $GITHUB_ENV
 
       - name: Update prod image tag in manifests
         run: |
-          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.PROMOTED_SHA }}|g" \
+          sed -i "s|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:.*|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod|g" \
             k8s/prod/backend.yaml
 
       - name: Commit and push updated manifest
@@ -184,7 +184,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/prod/backend.yaml
-          git diff --staged --quiet || git commit -m "Promote backend to prod — ${{ env.PROMOTED_SHA }}"
+          git diff --staged --quiet || git commit -m "Promote backend to prod"
           git push origin HEAD:main
 
       - name: Notify prod deployment
