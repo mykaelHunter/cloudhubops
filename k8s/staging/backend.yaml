@@ -48,7 +48,7 @@ spec:
         - name: acr-secret
       containers:
         - name: payday-backend
-          image: rapiddeploy.azurecr.io/rapiddeploy/payday-backend:69babdc
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-backend:staging
           ports:
             - containerPort: 5000
           envFrom:
