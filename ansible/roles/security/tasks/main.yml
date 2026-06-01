@@ -19,6 +19,27 @@
     state: present
   become: yes
 
+- name: Load br_netfilter module immediately
+  modprobe:
+    name: br_netfilter
+    state: present
+  become: yes
+
+- name: Load overlay module immediately
+  modprobe:
+    name: overlay
+    state: present
+  become: yes
+
+- name: Persist kernel modules across reboots
+  copy:
+    dest: /etc/modules-load.d/kubernetes.conf
+    content: |
+      br_netfilter
+      overlay
+    mode: '0644'
+  become: yes
+
 - name: Set kernel parameters for Kubernetes
   sysctl:
     name: "{{ item.name }}"

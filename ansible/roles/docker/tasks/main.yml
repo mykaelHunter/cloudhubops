@@ -3,11 +3,11 @@
 # Role: docker — Install and configure Docker
 # ============================================================
 
-- name: Update apt cache
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
-  become: yes
+- name: Check if Docker is already installed
+  command: docker --version
+  register: docker_check
+  changed_when: false
+  failed_when: false
 
 - name: Install required system packages
   apt:
@@ -19,29 +19,55 @@
       - lsb-release
       - software-properties-common
     state: present
+    update_cache: yes
   become: yes
+  when: docker_check.rc != 0
 
 - name: Install Docker
   apt:
     name: docker.io
     state: present
   become: yes
+  when: docker_check.rc != 0
 
-- name: Enable and start Docker service
+- name: Check if docker.socket is active
+  command: systemctl is-active docker.socket
+  register: socket_status
+  changed_when: false
+  failed_when: false
+  become: yes
+
+- name: Start docker.socket if not active
   systemd:
-    name: docker
-    enabled: yes
+    name: docker.socket
     state: started
+    enabled: yes
+  become: yes
+  when: socket_status.stdout != "active"
+
+- name: Wait for docker socket file
+  wait_for:
+    path: /run/docker.sock
+    state: present
+    timeout: 15
   become: yes
 
-- name: Add user to docker group
-  user:
-    name: "{{ ansible_user }}"
-    groups: docker
-    append: yes
+- name: Check if docker.service is active
+  command: systemctl is-active docker.service
+  register: service_status
+  changed_when: false
+  failed_when: false
   become: yes
 
-- name: Set Docker daemon config (resource limits)
+- name: Start docker.service if not active
+  systemd:
+    name: docker.service
+    state: started
+    enabled: yes
+  become: yes
+  when: service_status.stdout != "active"
+
+- name: Write Docker daemon config
   copy:
     dest: /etc/docker/daemon.json
     content: |
@@ -50,24 +76,56 @@
         "log-opts": {
           "max-size": "10m",
           "max-file": "3"
-        },
-        "default-ulimits": {
-          "nofile": {
-            "Name": "nofile",
-            "Hard": 64000,
-            "Soft": 64000
-          }
         }
       }
     mode: '0644'
   become: yes
-  notify: restart docker
+  register: daemon_config
+
+- name: Restart Docker if config changed
+  block:
+    - name: Stop docker service
+      systemd:
+        name: docker.service
+        state: stopped
+      become: yes
+
+    - name: Restart docker socket
+      systemd:
+        name: docker.socket
+        state: restarted
+      become: yes
+
+    - name: Wait for socket
+      wait_for:
+        path: /run/docker.sock
+        state: present
+        timeout: 15
+      become: yes
+
+    - name: Start docker service
+      systemd:
+        name: docker.service
+        state: started
+      become: yes
+  when: daemon_config.changed
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  become: yes
+
+- name: Reset connection to pick up docker group
+  meta: reset_connection
 
 - name: Verify Docker is running
   command: docker info
   register: docker_info
   changed_when: false
+  become: yes
 
-- name: Print Docker version
+- name: Print Docker status
   debug:
-    msg: "Docker installed: {{ docker_info.stdout_lines[0] }}"
+    msg: "Docker is running successfully"

@@ -1,6 +1,28 @@
 ---
 - name: restart docker
-  systemd:
-    name: docker
-    state: restarted
+  block:
+    - name: Stop docker socket and service
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - docker.service
+        - docker.socket
+      ignore_errors: yes
+
+    - name: Reset failed state
+      command: systemctl reset-failed docker.socket docker.service
+      ignore_errors: yes
+
+    - name: Start docker socket first
+      systemd:
+        name: docker.socket
+        state: started
+        enabled: yes
+
+    - name: Start docker service
+      systemd:
+        name: docker.service
+        state: started
+        enabled: yes
   become: yes

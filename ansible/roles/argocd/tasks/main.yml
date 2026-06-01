@@ -22,10 +22,21 @@
   register: argocd_cli_version
   changed_when: false
 
-- name: Apply ArgoCD manifests to kind cluster
-  command: kubectl apply -n {{ argocd_namespace }} -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+- name: Check if ArgoCD is already installed
+  command: kubectl get deployment argocd-server -n {{ argocd_namespace }}
+  register: argocd_check
+  changed_when: false
+  failed_when: false
+
+- name: Apply ArgoCD manifests to kind cluster (server-side apply)
+  command: >
+    kubectl apply -n {{ argocd_namespace }}
+    -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    --server-side
   register: argocd_install
-  changed_when: "'configured' in argocd_install.stdout or 'created' in argocd_install.stdout"
+  changed_when: true
+  failed_when: false
+  when: argocd_check.rc != 0
 
 - name: Wait for ArgoCD pods to be ready
   command: kubectl wait --for=condition=Ready pods --all -n {{ argocd_namespace }} --timeout=300s
@@ -52,19 +63,77 @@
   debug:
     msg: "ArgoCD admin password: {{ argocd_admin_password }} — CHANGE THIS IMMEDIATELY"
 
-- name: Start ArgoCD port-forward in background
-  shell: "nohup kubectl port-forward svc/argocd-server -n {{ argocd_namespace }} {{ argocd_port }}:443 &>/tmp/argocd-portforward.log &"
-  changed_when: false
+- name: Create ArgoCD port-forward systemd service
+  copy:
+    dest: /etc/systemd/system/argocd-portforward.service
+    content: |
+      [Unit]
+      Description=ArgoCD Port Forward
+      After=network.target
 
-- name: Wait for ArgoCD port-forward to be ready
+      [Service]
+      ExecStart=/usr/local/bin/kubectl port-forward svc/argocd-server -n argocd {{ argocd_port }}:443
+      Restart=always
+      RestartSec=5
+      User={{ ansible_user }}
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: '0644'
+  become: yes
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Enable and start argocd port-forward service
+  systemd:
+    name: argocd-portforward
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Wait for ArgoCD port to be available
   wait_for:
     port: "{{ argocd_port }}"
     host: localhost
-    timeout: 30
+    timeout: 60
+    delay: 5
 
 - name: Login to ArgoCD CLI
   command: "argocd login localhost:{{ argocd_port }} --insecure --username admin --password {{ argocd_admin_password }}"
   changed_when: false
+  retries: 5
+  delay: 5
+  register: argocd_login
+  until: argocd_login.rc == 0
+
+- name: Check if AKS cluster already registered in ArgoCD
+  command: argocd cluster get cloudopshub-aks
+  register: aks_cluster_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Azure CLI via official apt repository shortcut
+  ansible.builtin.shell: |
+    set -e
+    curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/azure-cli.list
+    sudo apt-get update && sudo apt-get install -y azure-cli
+  args:
+    creates: /usr/bin/az
+
+- name: Log into Azure via Service Principal
+  ansible.builtin.shell: |
+    az login --service-principal -u "{{ azure_client_id }}" -p "{{ azure_secret }}" --tenant "{{ azure_tenant_id }}"
+  changed_when: false
+  no_log: true # This prevents your secret credentials from showing up in the Ansible logs
+
+- name: Get AKS kubeconfig credentials
+  ansible.builtin.shell: |
+    az aks get-credentials --resource-group cloudopshub-rg --name cloudopshub-aks --overwrite-existing
+  changed_when: true
 
 - name: Add AKS cluster to ArgoCD
   command: "argocd cluster add cloudopshub-aks --name cloudopshub-aks --yes"
@@ -73,6 +142,7 @@
   failed_when:
     - aks_cluster_add.rc != 0
     - "'already exists' not in aks_cluster_add.stderr"
+  when: aks_cluster_check.rc != 0
 
 - name: Create ArgoCD applications
   command: >
