@@ -23,7 +23,7 @@ FROM nginx:1.30-alpine
 RUN apk upgrade --no-cache libxml2
 
 # Configure nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/templates/default.conf.templates
 
 # Expose default env vars — overridden per environment
 ENV BACKEND_HOST=localhost
