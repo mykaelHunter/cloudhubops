@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+  namespace: dev
+type: Opaque
+stringData:
+  SECRET_KEY: "dev-secret-change-in-prod"
+  DB_PASS: "devpassword"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: dev
+data:
+  FLASK_ENV: "production"
+  FLASK_DEBUG: "false"
+  DB_HOST: "payday-postgres"
+  DB_PORT: "5432"
+  DB_NAME: "payday"
+  DB_USER: "postgres"
+  DB_SSLMODE: "disable"
+  ALLOWED_ORIGINS: "http://localhost:8080,http://payday-frontend.dev.svc.cluster.local"
+  PORT: "5000"
+  WORKERS: "2"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payday-backend
+  namespace: dev
+  labels:
+    app: payday-backend
+    environment: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payday-backend
+  template:
+    metadata:
+      labels:
+        app: payday-backend
+        environment: dev
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: payday-backend
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-backend:dev
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: SECRET_KEY
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: DB_PASS
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            failureThreshold: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payday-backend
+  namespace: dev
+spec:
+  selector:
+    app: payday-backend
+  ports:
+    - port: 5000
+      targetPort: 5000

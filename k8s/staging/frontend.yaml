@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payday-frontend
+  namespace: staging
+  labels:
+    app: payday-frontend
+    environment: staging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payday-frontend
+  template:
+    metadata:
+      labels:
+        app: payday-frontend
+        environment: staging
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: payday-frontend
+          image: rapiddeploy.azurecr.io/rapiddeploy/payday-frontend:staging
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payday-frontend
+  namespace: staging
+spec:
+  selector:
+    app: payday-frontend
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30081

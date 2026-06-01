@@ -1,0 +1,138 @@
+name: CloudOpsHub CI Frontend Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/frontend/**'
+      - '.github/workflows/frontend_pipeline_ci.yaml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/frontend/**'
+
+env:
+  REGISTRY: rapiddeploy.azurecr.io
+  IMAGE_NAME: rapiddeploy/payday-frontend
+
+jobs:
+  # 🔒 SECURITY, QUALITY GATES & BUILD
+  test-and-scan-build:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/develop' && 'dev' || 'staging' }}
+    permissions:
+      contents: read
+      security-events: write # For CodeQL/SARIF
+      packages: write        # Required to push to ACR
+      id-token: write        # Required for OIDC login & Cosign keyless signing
+
+    outputs:
+      image_name_lower: ${{ steps.downcase.outputs.lowercase }}
+      image_tag: ${{ steps.tag.outputs.ENV_TAG }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Downcase image name for Docker
+        id: downcase
+        run: |
+          LOWEST=${IMAGE_NAME,,}
+          echo "lowercase=${LOWEST}" >> $GITHUB_OUTPUT
+          echo "IMAGE_NAME_LOWER=${LOWEST}" >> $GITHUB_ENV
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+
+      # Determine image tag and Dockerfile based on branch
+      - name: Set environment tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "ENV_TAG=dev" >> $GITHUB_OUTPUT
+            echo "ENV_TAG=dev" >> $GITHUB_ENV
+            echo "DOCKERFILE=Dockerfile.dev" >> $GITHUB_ENV
+          else
+            echo "ENV_TAG=staging" >> $GITHUB_OUTPUT
+            echo "ENV_TAG=staging" >> $GITHUB_ENV
+            echo "DOCKERFILE=Dockerfile.prod" >> $GITHUB_ENV
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: src/frontend
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: src/frontend
+        run: npm run test
+
+      - name: Run SAST (CodeQL)
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript
+
+      - uses: github/codeql-action/analyze@v4
+
+      - name: Build Docker image (multi-stage)
+        working-directory: src/frontend
+        run: |
+          docker build \
+            --build-arg NODE_ENV=${{ env.ENV_TAG }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.ENV_TAG }} \
+            -f ${{ env.DOCKERFILE }} .
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Log in to Azure via OIDC
+        if: github.event_name != 'pull_request'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        if: github.event_name != 'pull_request'
+        run: az acr login --name rapiddeploy
+
+      - name: Push image to registry
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ env.ENV_TAG }}
+
+      - name: Install Cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign Docker Image
+        if: github.event_name != 'pull_request'
+        run: |
+          cosign sign --yes \
+            -a "github_actor=${{ github.actor }}" \
+            -a "run_id=${{ github.run_id }}" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
