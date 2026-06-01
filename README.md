@@ -15,6 +15,7 @@
 - [Repository Structure](#repository-structure)
 - [Quick Start](#quick-start)
 - [Environment Details](#environment-details)
+- [Screenshots](#screenshots)
 - [Contributing](#contributing)
 
 ---
@@ -380,3 +381,35 @@ Each environment requires these secrets configured in **GitHub → Settings → 
 2. Open a PR to `develop` → CI runs automatically
 3. Merge to `main` → deploys to staging
 4. Production deploys require team lead approval in GitHub Environments
+
+**Screenshots**
+
+Below are repository screenshots (paths reference files added under the `screenshots/` directory):
+
+- **Application**
+    - [screenshots/01-application/01_app-login-page.png](screenshots/01-application/01_app-login-page.png)
+    - [screenshots/01-application/02_app-merchant-console.png](screenshots/01-application/02_app-merchant-console.png)
+    - [screenshots/01-application/03_app-api-page.png](screenshots/01-application/03_app-api-page.png)
+
+- **Infrastructure**
+    - [screenshots/02-infrastructure/01_argocd-all-apps-synced.png](screenshots/02-infrastructure/01_argocd-all-apps-synced.png)
+    - [screenshots/02-infrastructure/02_kind-cluster-dev-staging-pods.png](screenshots/02-infrastructure/02_kind-cluster-dev-staging-pods.png)
+    - [screenshots/02-infrastructure/03_aks-cluster-prod-pods-3-replicas.png](screenshots/02-infrastructure/03_aks-cluster-prod-pods-3-replicas.png)
+    - [screenshots/02-infrastructure/04_azure-container-registry-images.png](screenshots/02-infrastructure/04_azure-container-registry-images.png)
+
+- **CI/CD Pipelines**
+    - [screenshots/03-cicd-pipelines/01_backend-ci-pipeline.png](screenshots/03-cicd-pipelines/01_backend-ci-pipeline.png)
+    - [screenshots/03-cicd-pipelines/02_frontend-ci-pipeline.png](screenshots/03-cicd-pipelines/02_frontend-ci-pipeline.png)
+    - [screenshots/03-cicd-pipelines/03_backend-cd-pipeline-staging.png](screenshots/03-cicd-pipelines/03_backend-cd-pipeline-staging.png)
+    - [screenshots/03-cicd-pipelines/04_backend-cd-pipeline-production.png](screenshots/03-cicd-pipelines/04_backend-cd-pipeline-production.png)
+    - [screenshots/03-cicd-pipelines/05_frontend-cd-pipeline-staging.png](screenshots/03-cicd-pipelines/05_frontend-cd-pipeline-staging.png)
+    - [screenshots/03-cicd-pipelines/06_frontend-cd-pipeline-production.png](screenshots/03-cicd-pipelines/06_frontend-cd-pipeline-production.png)
+
+- **Observability**
+    - [screenshots/04-observability/01_grafana-prometheus-alertmanager.png](screenshots/04-observability/01_grafana-prometheus-alertmanager.png)
+    - [screenshots/04-observability/02_grafana-kubernetes-api-server-slo.png](screenshots/04-observability/02_grafana-kubernetes-api-server-slo.png)
+    - [screenshots/04-observability/03_grafana-argocd-namespace-cpu-usage.png](screenshots/04-observability/03_grafana-argocd-namespace-cpu-usage.png)
+    - [screenshots/04-observability/04_grafana-argocd-namespace-network-bandwidth.png](screenshots/04-observability/04_grafana-argocd-namespace-network-bandwidth.png)
+    - [screenshots/04-observability/05_grafana-kubelet-pods-containers.png](screenshots/04-observability/05_grafana-kubelet-pods-containers.png)
+    - [screenshots/04-observability/06_grafana-kubelet-storage-operations.png](screenshots/04-observability/06_grafana-kubelet-storage-operations.png)
+    - [screenshots/04-observability/07_grafana-kubelet-request-duration-memory-cpu.png](screenshots/04-observability/07_grafana-kubelet-request-duration-memory-cpu.png)
