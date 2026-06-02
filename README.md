@@ -413,3 +413,8 @@ Below are repository screenshots (paths reference files added under the `screens
     - [screenshots/04-observability/05_grafana-kubelet-pods-containers.png](screenshots/04-observability/05_grafana-kubelet-pods-containers.png)
     - [screenshots/04-observability/06_grafana-kubelet-storage-operations.png](screenshots/04-observability/06_grafana-kubelet-storage-operations.png)
     - [screenshots/04-observability/07_grafana-kubelet-request-duration-memory-cpu.png](screenshots/04-observability/07_grafana-kubelet-request-duration-memory-cpu.png)
+    - [screenshots/04-observability/08_alertmanager-alerts-overview.png](screenshots/04-observability/08_alertmanager-alerts-overview.png)
+    - [screenshots/04-observability/09_alertmanager-alerts-expanded.png](screenshots/04-observability/09_alertmanager-alerts-expanded.png)
+    - [screenshots/04-observability/10_alertmanager-alerts-filtered-namespace.png](screenshots/04-observability/10_alertmanager-alerts-filtered-namespace.png)
+    - [screenshots/04-observability/11_alertmanager-status.png](screenshots/04-observability/11_alertmanager-status.png)
+    - [screenshots/04-observability/12_alertmanager-status-details.png](screenshots/04-observability/12_alertmanager-status-details.png)
