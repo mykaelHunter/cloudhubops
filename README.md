@@ -422,3 +422,5 @@ Below are repository screenshots (paths reference files added under the `screens
     - [screenshots/04-observability/10_alertmanager-alerts-filtered-namespace.png](screenshots/04-observability/10_alertmanager-alerts-filtered-namespace.png)
     - [screenshots/04-observability/11_alertmanager-status.png](screenshots/04-observability/11_alertmanager-status.png)
     - [screenshots/04-observability/12_alertmanager-status-details.png](screenshots/04-observability/12_alertmanager-status-details.png)
+    - [screenshots/04-observability/13_alertmanager-slack-alerts-kube-scheduler-down.png](screenshots/04-observability/13_alertmanager-slack-alerts-kube-scheduler-down.png)
+    - [screenshots/04-observability/14_alertmanager-slack-alerts-kube-proxy-down.png](screenshots/04-observability/14_alertmanager-slack-alerts-kube-proxy-down.png)
