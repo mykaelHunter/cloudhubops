@@ -130,9 +130,9 @@ graph TB
 
 | Environment | Cluster | Namespace | Replicas | Notes |
 |---|---|---|---|---|
-| dev | AKS | dev | 1 | Auto-deploy on `develop` push |
-| staging | AKS | staging | 2 | Auto-deploy on `main` push |
-| prod | kind (local) | prod | 3 | Manual approval required |
+| dev | AKS/kind | dev | 1 | Auto-deploy on `develop` push |
+| staging | AKS/kind | staging | 2 | Auto-deploy on `main` push |
+| prod | AKS/kind | prod | 3 | Manual approval required |
 
 > **Design decision:** dev and staging run on AKS for cloud-native testing. Prod runs on the local kind cluster to demonstrate latency differences between cloud and on-premise deployments — a key project requirement.
 
