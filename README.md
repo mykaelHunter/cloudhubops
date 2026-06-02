@@ -242,13 +242,17 @@ cloudopshub/
 │       ├── backend_pipeline_cd.yaml     # Backend CD
 │       ├── frontend_pipeline_ci.yaml    # Frontend CI
 │       └── frontend_pipeline_cd.yaml   # Frontend CD
-├── infra/
-│   └── terraform/
-│       └── aks/
-│           ├── main.tf
-│           ├── variables.tf
-│           ├── providers.tf
-│           └── outputs.tf
+├── cloudopshub-terraform/
+│   ├── .terraform.lock.hcl
+│   ├── main.tf
+│   ├── provider.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   └── modules/
+│       ├── acr/
+│       ├── aks/
+│       ├── networking/
+│       └── resource-group/
 ├── ansible/
 │   ├── site.yml                         # Master playbook
 │   ├── inventory.ini
@@ -303,7 +307,7 @@ cd cloudopshub
 ### 2. Provision AKS with Terraform
 
 ```bash
-cd infra/terraform/aks
+cd cloudopshub-terraform
 terraform init
 terraform plan
 terraform apply
