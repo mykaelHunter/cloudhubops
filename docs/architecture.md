@@ -14,7 +14,7 @@
 
 ## System Overview
 
-CloudOpsHub is a multi-cluster SaaS platform serving analytics dashboards to SMEs across Africa and Europe. The platform is designed around three core principles:
+CloudOpsHub is a hybrid multi-cluster SaaS platform serving analytics dashboards to SMEs across Africa and Europe. The platform is designed around three core principles:
 
 1. **Everything is code** — Infrastructure, configuration, deployments, and alerts are all version-controlled
 2. **GitOps is the source of truth** — No manual `kubectl apply` in production; all changes flow through Git
@@ -106,6 +106,8 @@ Port mappings:
 
 The kind cluster is where ArgoCD lives. It manages itself (in-cluster) and the AKS cluster remotely.
 
+> Note: when accessing the ArgoCD UI from the host machine, use `kubectl port-forward svc/argocd-server -n argocd 9090:443` and SSH tunnel port `9090` to avoid conflicts with the application ingress on host port `8080`.
+
 ---
 
 ## Application Layer
@@ -155,7 +157,12 @@ The kind cluster is where ArgoCD lives. It manages itself (in-cluster) and the A
 ---
 
 ## CI/CD Layer
+### GitHub Environments and OIDC
 
+GitHub Actions uses environment-scoped deployment jobs with Azure OIDC authentication.
+- `dev` deploys automatically from `develop`
+- `staging` deploys automatically from `main`
+- `production` requires manual approval before promotion
 ### CI Pipeline (GitHub Actions)
 
 **Triggered by:** Push to `develop` or `main`, or PR to `main`

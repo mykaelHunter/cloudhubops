@@ -36,6 +36,16 @@ kubectl get pods -n prod --context=kind-cloudopshub-local
 kubectl get pods -n dev --context=cloudopshub-aks
 ```
 
+### Azure CLI Login from a Headless VM
+
+If the VM has no browser, authenticate with device code flow:
+
+```bash
+az login --use-device-code
+```
+
+Then open the provided URL on another device and enter the code shown by the CLI.
+
 ### ArgoCD Access
 
 ArgoCD runs on the kind cluster. Access the UI via SSH tunnel:
@@ -50,6 +60,8 @@ ssh -L 9090:localhost:9090 <vm-user>@<vm-ip>
 # Then open in browser
 https://localhost:9090
 ```
+
+> Note: use port `9090` for ArgoCD because host port `8080` is already used for the application ingress mapping in the kind cluster.
 
 CLI login:
 ```bash
@@ -77,7 +89,14 @@ kubectl get svc prometheus-grafana -n monitoring --context=cloudopshub-aks
 
 ### Standard Deployment (Automated)
 
-Deployments to dev and staging are fully automated. No manual steps required.
+Deployments to dev and staging are fully automated. No manual steps are required for the branch-based flow.
+
+| Trigger | Target | Cluster | Notes |
+|---|---|---|---|
+| Push to `develop` | `dev` | AKS | Auto deploys via GitHub Actions and ArgoCD |
+| Merge PR to `main` | `staging` | AKS | Auto deploys via GitHub Actions and ArgoCD |
+| Approve `production` environment | `prod` | kind | Manual approval gate before promotion |
+
 
 | Action | Result |
 |---|---|

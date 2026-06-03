@@ -294,7 +294,8 @@ cloudopshub/
 
 - Ubuntu VM (min 7GB RAM, 2 vCPUs)
 - Azure account with active subscription
-- Azure CLI installed and logged in
+- Azure CLI installed
+- Azure login from the VM using `az login --use-device-code`
 - Ansible installed on your local machine
 
 ### 1. Clone the repo
@@ -314,6 +315,10 @@ terraform apply
 az aks get-credentials --resource-group cloudopshub-rg --name cloudopshub-aks
 ```
 
+### 2.5. Create GitHub Environments
+
+In your repository, create the environments `dev`, `staging`, and `production` under Settings → Environments. This enables environment-scoped secrets and the manual approval gate used by the production workflow.
+
 ### 3. Bootstrap the VM with Ansible
 
 ```bash
@@ -329,6 +334,8 @@ kubectl config get-contexts
 kubectl get nodes --context=kind-cloudopshub-local
 kubectl get nodes --context=cloudopshub-aks
 ```
+
+> Note: the local kind cluster is used for the `prod` environment and the AKS cluster is used for `dev` and `staging` in this repository's current GitOps flow.
 
 ### 5. Create ACR pull secrets
 
@@ -369,6 +376,11 @@ Each environment requires these secrets configured in **GitHub → Settings → 
 | `AZURE_TENANT_ID` | Azure AD tenant ID |
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
 
+The repo uses three GitHub environments:
+- `dev` — automated deployment from `develop`
+- `staging` — automated deployment from `main`
+- `production` — manual approval gate for prod promotion
+
 ### ArgoCD Applications
 
 | App | Source Path | Target Cluster | Namespace | Sync |
@@ -376,6 +388,8 @@ Each environment requires these secrets configured in **GitHub → Settings → 
 | cloudopshub-dev | k8s/dev | AKS | dev | Auto |
 | cloudopshub-staging | k8s/staging | AKS | staging | Auto |
 | cloudopshub-prod | k8s/prod | kind | prod | Manual |
+
+> Tip: if you want to run a reverse latency test later, swap the ArgoCD destination clusters between `dev/staging` and `prod` to compare cloud vs local execution paths.
 
 ---
 
