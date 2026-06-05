@@ -266,24 +266,35 @@ cloudopshub/
 │       └── security/
 ├── k8s/
 │   ├── dev/
+│   │   ├── acr-sealed-secret.yaml
+│   │   ├── backend-sealed-secret.yaml
 │   │   ├── backend.yaml
 │   │   ├── frontend.yaml
+│   │   ├── postgres-sealed-secret.yaml
 │   │   └── postgres.yaml
 │   ├── staging/
+│   │   ├── acr-sealed-secret.yaml
+│   │   ├── backend-sealed-secret.yaml
 │   │   ├── backend.yaml
 │   │   ├── frontend.yaml
+│   │   ├── postgres-sealed-secret.yaml
 │   │   └── postgres.yaml
 │   └── prod/
+│       ├── acr-sealed-secret.yaml
+│       ├── backend-sealed-secret.yaml
 │       ├── backend.yaml
 │       ├── frontend.yaml
+│       ├── postgres-sealed-secret.yaml
 │       └── postgres.yaml
 ├── src/
 │   ├── backend/                         # Flask API
 │   └── frontend/                        # React + Vite
 └── docs/
-    ├── architecture.md
-    ├── runbook.md
-    └── medium-article.md
+    ├── architecture.md                  # System architecture & design decisions
+    ├── cost-analysis.md                 # Cloud cost analysis
+    ├── cost-analysis.csv                # Cost breakdown (CSV)
+    └── runbook.md                       # Day-to-day operations & troubleshooting
+
 ```
 
 ---
