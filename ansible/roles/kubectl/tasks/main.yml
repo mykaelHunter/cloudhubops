@@ -48,3 +48,33 @@
     path: "/home/{{ ansible_user }}/.bashrc"
     line: "alias k=kubectl"
     state: present
+
+# In ansible/roles/kubectl/tasks/main.yml
+- name: Get latest kubeseal version
+  uri:
+    url: https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest
+    return_content: yes
+  register: kubeseal_release
+
+- name: Set kubeseal version
+  set_fact:
+    kubeseal_version: "{{ (kubeseal_release.content | from_json).tag_name | regex_replace('^v', '') }}"
+
+- name: Download kubeseal
+  get_url:
+    url: "https://github.com/bitnami-labs/sealed-secrets/releases/download/v{{ kubeseal_version }}/kubeseal-{{ kubeseal_version }}-linux-amd64.tar.gz"
+    dest: /tmp/kubeseal.tar.gz
+
+- name: Extract kubeseal
+  unarchive:
+    src: /tmp/kubeseal.tar.gz
+    dest: /tmp
+    remote_src: yes
+
+- name: Install kubeseal
+  copy:
+    src: /tmp/kubeseal
+    dest: /usr/local/bin/kubeseal
+    mode: '0755'
+    remote_src: yes
+  become: yes

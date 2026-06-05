@@ -287,6 +287,12 @@ GitHub Actions authenticates to Azure using **OpenID Connect (OIDC)** — no sto
 - ACR pull secret (`acr-secret`) injected per namespace
 - RBAC roles scoped per team member via Azure Entra ID guest invitations
 
+### Sealed Secrets
+
+- Secrets are stored in the Git repository as `SealedSecret` resources (apiVersion: `bitnami.com/v1alpha1`). Encrypted manifests live under the `k8s/` environment directories (for example [k8s/dev/backend-sealed-secret.yaml](k8s/dev/backend-sealed-secret.yaml)).
+- The Bitnami Sealed Secrets controller (installed in the cluster) decrypts `SealedSecret` resources and creates regular Kubernetes `Secret` objects at sync time. This enables GitOps-friendly, auditable secret management without storing plaintext secrets in Git.
+- Operational notes: install the Bitnami Sealed Secrets controller via Helm or the upstream manifests; when creating secrets locally use `kubectl create secret ... -o yaml | kubeseal --format yaml --controller-name <name> --controller-namespace <ns> > k8s/<env>/<name>-sealed-secret.yaml` and commit the resulting file.
+
 ---
 
 ## Architecture Decision Records

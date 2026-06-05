@@ -150,7 +150,7 @@ graph TB
 | CI | GitHub Actions | Build, test, scan, push images |
 | CD / GitOps | ArgoCD | Single install manages both clusters |
 | Registry | Azure ACR | Private container image registry |
-| Secrets | Kubernetes Secrets + OIDC | Secrets management, no stored credentials |
+| Secrets | Bitnami Sealed Secrets + OIDC | Secrets are stored encrypted as `SealedSecret` manifests (bitnami.com/v1alpha1) tracked in the repository under the `k8s/` directories; the Bitnami Sealed Secrets controller decrypts them in-cluster. CI/CD uses OIDC and ArgoCD applies sealed manifests. |
 | Scanning | Trivy + CodeQL | Container CVE + SAST scanning |
 | Image Signing | Cosign | Keyless image signing via Sigstore |
 | Metrics | Prometheus + Grafana | Cluster and app metrics, dashboards |
@@ -354,6 +354,28 @@ kubectl create secret docker-registry acr-secret \
   --docker-password="$(az acr credential show --name rapiddeploy --query 'passwords[0].value' -o tsv)" \
   --namespace prod --context=kind-cloudopshub-local
 ```
+
+### 5.5. Sealed Secrets (repo-managed)
+
+This repository tracks encrypted secret manifests using Bitnami Sealed Secrets. You will find `SealedSecret` manifests in each environment under the `k8s/` directories (for example [k8s/dev/acr-sealed-secret.yaml](k8s/dev/acr-sealed-secret.yaml), [k8s/staging/backend-sealed-secret.yaml](k8s/staging/backend-sealed-secret.yaml), [k8s/prod/postgres-sealed-secret.yaml](k8s/prod/postgres-sealed-secret.yaml)).
+
+To create or update a sealed secret locally (example):
+
+```bash
+# Create a Kubernetes secret and seal it into a git-safe SealedSecret
+kubectl create secret generic acr-credentials \
+    --from-literal=username=<acr-username> \
+    --from-literal=password=<acr-password> \
+    --namespace dev -o yaml \
+    | kubeseal --format yaml --controller-name sealed-secrets --controller-namespace kube-system \
+    > k8s/dev/acr-sealed-secret.yaml
+
+# Commit the sealed manifest and push — ArgoCD will apply it and the controller will create the in-cluster Secret
+git add k8s/dev/acr-sealed-secret.yaml && git commit -m "chore(secrets): add sealed secret for dev" && git push
+```
+
+Replace `--controller-name` / `--controller-namespace` with your Sealed Secrets controller values if different. See the runbook for operational steps.
+
 
 ### 6. Push code to trigger the pipeline
 

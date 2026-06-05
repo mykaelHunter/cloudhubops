@@ -398,6 +398,50 @@ kubectl port-forward svc/argocd-server -n argocd 9090:443 &
 
 ### Velero Backup Operations
 
+## 8. Certificate & Secret Rotation
+
+### Sealed Secrets (Bitnami) — create / update workflow
+
+This repository stores encrypted secret manifests (`SealedSecret`) in the `k8s/` directories (one per environment). The Bitnami Sealed Secrets controller running in the target cluster will decrypt these into Kubernetes `Secret` objects when the manifest is applied.
+
+Steps to create or update a sealed secret locally:
+
+1. Verify the Sealed Secrets controller namespace and name (commonly `sealed-secrets` in `kube-system` or `sealed-secrets` namespace). If unsure, ask the cluster administrator or list controllers:
+
+```bash
+# find the Sealed Secrets controller pod
+kubectl get pods -A | grep sealed-secrets
+```
+
+2. Create and seal the secret (example):
+
+```bash
+kubectl create secret generic backend-db-creds \
+  --from-literal=POSTGRES_USER=payday \
+  --from-literal=POSTGRES_PASSWORD='<strong-password>' \
+  --namespace staging -o yaml \
+  | kubeseal --format yaml --controller-name sealed-secrets --controller-namespace kube-system \
+  > k8s/staging/postgres-sealed-secret.yaml
+
+git add k8s/staging/postgres-sealed-secret.yaml
+git commit -m "chore(secrets): update postgres sealed secret for staging"
+git push
+```
+
+3. ArgoCD will detect the new/updated sealed manifest and apply it; the Sealed Secrets controller will create/rotate the in-cluster `Secret`.
+
+4. To fetch the public certificate used for sealing (if you need it):
+
+```bash
+# fetch controller public cert (example)
+kubeseal --fetch-cert --controller-name sealed-secrets --controller-namespace kube-system > pub-cert.pem
+```
+
+Notes:
+- Never commit plaintext secrets into the repository. Only commit the sealed YAML output.
+- If the Sealed Secrets controller is upgraded or reinstalled with a different key, existing SealedSecrets will no longer decrypt — coordinate key rotations carefully and follow controller documentation for key migration.
+
+
 ```bash
 # Create on-demand backup
 velero backup create cloudopshub-backup-$(date +%Y%m%d) \
