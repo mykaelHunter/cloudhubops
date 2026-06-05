@@ -72,6 +72,12 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            failureThreshold: 30  # Allows up to 5 minutes to boot (30 * 10s)
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
