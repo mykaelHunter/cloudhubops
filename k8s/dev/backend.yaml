@@ -1,14 +1,4 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: backend-secret
-  namespace: dev
-type: Opaque
-stringData:
-  SECRET_KEY: "dev-secret-change-in-prod"
-  DB_PASS: "devpassword"
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: backend-config
@@ -73,18 +63,25 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "300m"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            failureThreshold: 30  # Allows up to 5 minutes to boot (30 * 10s)
+            periodSeconds: 10
+            timeoutSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: 5000
-            initialDelaySeconds: 60
+            initialDelaySeconds: 20
             periodSeconds: 10
             failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /health
               port: 5000
-            initialDelaySeconds: 90
+            initialDelaySeconds: 30
             periodSeconds: 15
             failureThreshold: 5
 ---

@@ -1,13 +1,4 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-  namespace: dev
-type: Opaque
-stringData:
-  postgres-password: "devpassword"
----
-apiVersion: v1
 kind: Service
 metadata:
   name: payday-postgres
