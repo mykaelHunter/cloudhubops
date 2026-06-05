@@ -1,14 +1,4 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: backend-secret
-  namespace: dev
-type: Opaque
-stringData:
-  SECRET_KEY: "dev-secret-change-in-prod"
-  DB_PASS: "devpassword"
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: backend-config
